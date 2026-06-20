@@ -1,0 +1,15 @@
+[
+  {
+    "plant_id": "plant-001",
+    "name": "Parc Fotovoltaic Ilfov",
+    "owner": "SolarCo SRL",
+    "location": "Ilfov, Romania",
+    "country": "Romania",
+    "timezone": "Europe/Bucharest",
+    "installed_capacity_kwp": 530.0,
+    "sla_tier": "Gold",
+    "om_provider": "SolarOps Demo",
+    "status": "Active",
+    "go_live_date": "2022-03-20"
+  }
+]
