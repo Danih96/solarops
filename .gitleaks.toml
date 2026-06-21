@@ -1,0 +1,5 @@
+title = "SolarOps gitleaks config"
+
+[allowlist]
+description = "Intentionally fake tokens used in unit test fixtures"
+paths = ['''tests/test_analyze_ci_failure\.py''']
