@@ -410,4 +410,34 @@ Expected docs:
 * `docs/runbooks/`
 * `docs/demo-guide.md`
 
+## Learning Mode Rules
+
+After each implementation task, include:
+
+1. Diff summary
+2. Validation command
+3. Expected result
+4. Most likely failure and fix
+5. Theory
+6. Quiz questions
+
+The Theory section must explain:
+
+* the main concept;
+* why it matters in SolarOps;
+* how it applies to the files, commands, or configuration used in the task;
+* what real-world problem it prevents;
+* the common mistake to avoid;
+* how the decision could be explained in a DevOps or DevSecOps interview.
+
+The theory must be practical and connected to the current task. Do not give only a short definition. Explain the reasoning behind the implementation choice.
+
+For example, when explaining GitHub Actions CI design, cover the difference between jobs and steps, when jobs run in parallel by default, when `needs` should be used, why independent jobs should not be artificially chained, how this affects pull request feedback time, and how to explain the decision in an interview.
+
+The goal is to learn the DevOps and DevSecOps concepts behind each task, not only to apply commands.
+
+Quiz questions must only test concepts explicitly covered in the Theory section of the same response. Before writing each quiz question, verify that the answer can be derived from the theory just written — not from prior sessions, general knowledge, or concepts mentioned but not explained. If a concept appears in the implementation (a flag, a config key, a design choice) but is not explained in Theory, either explain it in Theory first or do not ask about it.
+
+
+
 Do not let implementation drift away from documentation.

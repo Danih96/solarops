@@ -1,0 +1,565 @@
+{
+  "name": "W2 Asset Registry Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-schedule",
+      "name": "Schedule: Daily 06:05",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "http://mock-api:8000/v1/plants",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-get-plants",
+      "name": "GET /v1/plants",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "={{ $json }}",
+        "options": {}
+      },
+      "id": "node-split-plants",
+      "name": "Split into plants",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "url": "=http://mock-api:8000/v1/plants/{{ $json.plant_id }}/devices",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-get-devices",
+      "name": "GET /v1/plants/{id}/devices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "={{ $json }}",
+        "options": {}
+      },
+      "id": "node-split-devices",
+      "name": "Split into devices",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $env.NOTION_PLANTS_DB_ID }}",
+          "mode": "id"
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Plant ID|rich_text",
+              "condition": "equals",
+              "value": "={{ $json.plant_id }}"
+            }
+          ]
+        },
+        "options": {
+          "downloadFiles": false
+        }
+      },
+      "id": "node-get-plant-page",
+      "name": "Notion: Get plant page ID",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1100, 0],
+      "credentials": {
+        "notionApi": {
+          "id": "notion-cred",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-plant-page-id",
+              "name": "plant_page_id",
+              "value": "={{ $json.results[0].id }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-device-id",
+              "name": "device_id",
+              "value": "={{ $('Split into devices').item.json.device_id }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-name",
+              "name": "device_name",
+              "value": "={{ $('Split into devices').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-asset-type",
+              "name": "asset_type",
+              "value": "={{ $('Split into devices').item.json.asset_type }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-vendor",
+              "name": "vendor",
+              "value": "={{ $('Split into devices').item.json.vendor }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-rated-power",
+              "name": "rated_power_kwp",
+              "value": "={{ $('Split into devices').item.json.rated_power_kwp }}",
+              "type": "number"
+            },
+            {
+              "id": "assign-serial",
+              "name": "serial_number",
+              "value": "={{ $('Split into devices').item.json.serial_number }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-status",
+              "name": "status",
+              "value": "={{ $('Split into devices').item.json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-installed",
+              "name": "installed_date",
+              "value": "={{ $('Split into devices').item.json.installed_date }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-set-context",
+      "name": "Set device + plant context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $env.NOTION_ASSETS_DB_ID }}",
+          "mode": "id"
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "SynaptiQ Device ID|rich_text",
+              "condition": "equals",
+              "value": "={{ $json.device_id }}"
+            }
+          ]
+        },
+        "options": {
+          "downloadFiles": false
+        }
+      },
+      "id": "node-search-asset",
+      "name": "Notion: Search asset by device ID",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1540, 0],
+      "credentials": {
+        "notionApi": {
+          "id": "notion-cred",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-exists",
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-if-exists",
+      "name": "IF: asset exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 0]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.results[0].id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "title": "={{ $('Set device + plant context').item.json.device_name }}"
+            },
+            {
+              "key": "Asset Type|select",
+              "selectValue": "={{ $('Set device + plant context').item.json.asset_type }}"
+            },
+            {
+              "key": "Plant|relation",
+              "pageId": "={{ $('Set device + plant context').item.json.plant_page_id }}"
+            },
+            {
+              "key": "Vendor|select",
+              "selectValue": "={{ $('Set device + plant context').item.json.vendor }}"
+            },
+            {
+              "key": "Rated Power kWp|number",
+              "numberValue": "={{ $('Set device + plant context').item.json.rated_power_kwp }}"
+            },
+            {
+              "key": "Serial Number|rich_text",
+              "textContent": "={{ $('Set device + plant context').item.json.serial_number }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "={{ $('Set device + plant context').item.json.status }}"
+            },
+            {
+              "key": "Last Seen|date",
+              "date": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "node-update-asset",
+      "name": "Notion: Update asset",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1980, -120],
+      "credentials": {
+        "notionApi": {
+          "id": "notion-cred",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $env.NOTION_ASSETS_DB_ID }}",
+          "mode": "id"
+        },
+        "title": "={{ $('Set device + plant context').item.json.device_name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "SynaptiQ Device ID|rich_text",
+              "textContent": "={{ $('Set device + plant context').item.json.device_id }}"
+            },
+            {
+              "key": "Asset Type|select",
+              "selectValue": "={{ $('Set device + plant context').item.json.asset_type }}"
+            },
+            {
+              "key": "Plant|relation",
+              "pageId": "={{ $('Set device + plant context').item.json.plant_page_id }}"
+            },
+            {
+              "key": "Vendor|select",
+              "selectValue": "={{ $('Set device + plant context').item.json.vendor }}"
+            },
+            {
+              "key": "Rated Power kWp|number",
+              "numberValue": "={{ $('Set device + plant context').item.json.rated_power_kwp }}"
+            },
+            {
+              "key": "Serial Number|rich_text",
+              "textContent": "={{ $('Set device + plant context').item.json.serial_number }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "={{ $('Set device + plant context').item.json.status }}"
+            },
+            {
+              "key": "Installed Date|date",
+              "date": "={{ $('Set device + plant context').item.json.installed_date }}"
+            },
+            {
+              "key": "Last Seen|date",
+              "date": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "node-create-asset",
+      "name": "Notion: Create asset",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1980, 120],
+      "credentials": {
+        "notionApi": {
+          "id": "notion-cred",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "node-merge",
+      "name": "Merge results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2200, 0]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "rows",
+        "options": {}
+      },
+      "id": "node-aggregate",
+      "name": "Aggregate stats",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2420, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-created",
+              "name": "records_created",
+              "value": "={{ $json.rows.filter(r => r.operation === 'created').length }}",
+              "type": "number"
+            },
+            {
+              "id": "assign-updated",
+              "name": "records_updated",
+              "value": "={{ $json.rows.filter(r => r.operation === 'updated').length }}",
+              "type": "number"
+            },
+            {
+              "id": "assign-total",
+              "name": "records_processed",
+              "value": "={{ $json.rows.length }}",
+              "type": "number"
+            },
+            {
+              "id": "assign-finished",
+              "name": "finished_at",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-set-stats",
+      "name": "Set audit stats",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2640, 0]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $env.NOTION_AUDIT_LOG_DB_ID }}",
+          "mode": "id"
+        },
+        "title": "={{ 'W2_' + new Date().toISOString().slice(0,16) }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Workflow Name|select",
+              "selectValue": "W2"
+            },
+            {
+              "key": "Trigger Type|select",
+              "selectValue": "Schedule"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "✅ Success"
+            },
+            {
+              "key": "Records Processed|number",
+              "numberValue": "={{ $json.records_processed }}"
+            },
+            {
+              "key": "Records Created|number",
+              "numberValue": "={{ $json.records_created }}"
+            },
+            {
+              "key": "Records Updated|number",
+              "numberValue": "={{ $json.records_updated }}"
+            },
+            {
+              "key": "Source Endpoint|rich_text",
+              "textContent": "/v1/plants/{id}/devices"
+            },
+            {
+              "key": "Target System|select",
+              "selectValue": "Notion"
+            },
+            {
+              "key": "Finished At|date",
+              "date": "={{ $json.finished_at }}"
+            }
+          ]
+        }
+      },
+      "id": "node-audit-log",
+      "name": "Notion: Write Audit Log",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2860, 0],
+      "credentials": {
+        "notionApi": {
+          "id": "notion-cred",
+          "name": "Notion API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: Daily 06:05": {
+      "main": [
+        [{ "node": "GET /v1/plants", "type": "main", "index": 0 }]
+      ]
+    },
+    "GET /v1/plants": {
+      "main": [
+        [{ "node": "Split into plants", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split into plants": {
+      "main": [
+        [{ "node": "GET /v1/plants/{id}/devices", "type": "main", "index": 0 }]
+      ]
+    },
+    "GET /v1/plants/{id}/devices": {
+      "main": [
+        [{ "node": "Split into devices", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split into devices": {
+      "main": [
+        [{ "node": "Notion: Get plant page ID", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion: Get plant page ID": {
+      "main": [
+        [{ "node": "Set device + plant context", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set device + plant context": {
+      "main": [
+        [{ "node": "Notion: Search asset by device ID", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion: Search asset by device ID": {
+      "main": [
+        [{ "node": "IF: asset exists?", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF: asset exists?": {
+      "main": [
+        [{ "node": "Notion: Update asset", "type": "main", "index": 0 }],
+        [{ "node": "Notion: Create asset", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion: Update asset": {
+      "main": [
+        [{ "node": "Merge results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion: Create asset": {
+      "main": [
+        [{ "node": "Merge results", "type": "main", "index": 1 }]
+      ]
+    },
+    "Merge results": {
+      "main": [
+        [{ "node": "Aggregate stats", "type": "main", "index": 0 }]
+      ]
+    },
+    "Aggregate stats": {
+      "main": [
+        [{ "node": "Set audit stats", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set audit stats": {
+      "main": [
+        [{ "node": "Notion: Write Audit Log", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "W-Err Global Error Handler"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": ["solarops", "assets", "notion"]
+}

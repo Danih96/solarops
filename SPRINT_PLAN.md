@@ -1,98 +1,86 @@
-# Sprint Plan — Phase 0: Foundation Setup & Alignment
+# Sprint Plan — Phase 2: Notion Schema + W-Reg + W2
 
-**Goal:** A clean local-first stack aligned to the Notion-first direction, plus a
-documented 7-DB Notion workspace and a passing health check.
-**Duration:** Days 1–2
-**Status:** Not started
-**Roadmap ref:** `PROJECT_PLAN.md` → Implementation Phases, Days 1–2
+**Goal:** Full 7-DB Notion workspace documented and n8n workflows W-Reg and W2
+exported as importable JSON. Plant and asset registry sync end-to-end.
+**Duration:** Days 6–8
+**Status:** In progress
+**Roadmap ref:** `PROJECT_PLAN.md` → Implementation Phases, Days 6–8
+
+---
+
+> **Completed sprints**
+> - Phase 0 (Days 1–2): Docker stack, config, safety — ✅ done
+> - Phase 1 (Days 3–5): Mock API endpoints, pyproject.toml, CI — ✅ done
 
 ---
 
 ## Deliverables
 
-### Docker stack (target state for this sprint)
-- [ ] `docker-compose.yml` services: mock-api + n8n + timescaledb + grafana on `solarops-net`
-- [ ] Gotenberg **removed** (returns only with the PDF portfolio extension)
-- [ ] n8n on **SQLite** (own `n8n_data` volume) — NOT TimescaleDB as backend
-- [ ] TimescaleDB minimal: `plant_kpis` schema only; 5432 bound to `127.0.0.1`
-- [ ] Grafana added (:3001), provisioning dir reserved for as-code datasource/dashboards
-- [ ] Image tags **pinned** (no `:latest`)
+### Notion workspace documentation
+- [x] `notion/schema.md` — 7-DB schema with correct Relation fields (not Select)
+- [x] Plants DB documented as the spine (DB 1 — created first)
+- [x] Workflow Runs / Audit Log documented (DB 7)
+- [x] Dedup key for every database listed
+- [x] Creation order, share steps, and DB ID instructions documented
+- [ ] 7 DBs **manually created** in Notion UI by user
+- [ ] Integration token added to n8n Credentials
+- [ ] All 7 DB IDs added to local `.env`
 
-### Config & safety
-- [ ] `.env.example` — all required vars with placeholders (Notion token, n8n encryption key, DB creds, Grafana admin password)
-- [ ] `.gitignore` — `.env`, `n8n_data/`, `__pycache__/`, `.pytest_cache/`, `backups/`
-- [ ] No secrets committed (gitleaks-clean from the start)
+### n8n workflows
+- [x] `n8n/workflows/w-reg.json` — Plant Registry Sync (importable)
+- [x] `n8n/workflows/w2-asset-sync.json` — Asset Registry Sync (importable)
+- [ ] Both workflows **imported** in running n8n and manually tested
+- [ ] Audit log row visible in Workflow Runs / Audit Log DB after each run
 
-### Mock API (minimal — endpoints expand Days 3–5)
-- [ ] `mock-api/main.py` — `/health` endpoint only
-- [ ] `mock-api/Dockerfile` — multi-stage, non-root
-- [ ] Pinned deps in `mock-api/requirements.txt` (migrates to `pyproject.toml` Days 3–5)
-
-### Notion workspace (documented and created in Phase 0–1)
-- [ ] 7 DBs per `PROJECT_PLAN.md`: Plants, Assets, Daily Performance, Service Tickets,
-      PM Tickets, Reports, Workflow Runs / Audit Log
-- [ ] `Plant` modeled as **Relation → Plants** (not a free-text Select)
-- [ ] Notion integration token (`secret_xxx`) added to n8n Credentials store
-- [ ] All 7 DB IDs added to `.env` (placeholders in `.env.example`)
-
-### Flagged cleanup (execution within this sprint)
-- [ ] Remove stray `{docs,mock-api` directory (brace-expansion artifact from prior session)
+### .env.example
+- [ ] Add `NOTION_AUDIT_LOG_DB_ID` placeholder (currently missing)
 
 ---
 
 ## Validation Gate
 
 ```bash
-# 1. Stack starts cleanly — 4 services, no Gotenberg
-docker compose up -d
-docker compose ps
-# Expected: mock-api, n8n, timescaledb, grafana all Up (healthy); no gotenberg container
+# 1. Validate workflow JSON files are importable (basic JSON syntax)
+python3 -c "import json; json.load(open('n8n/workflows/w-reg.json'))" && echo "w-reg OK"
+python3 -c "import json; json.load(open('n8n/workflows/w2-asset-sync.json'))" && echo "w2 OK"
+# Expected: "w-reg OK" and "w2 OK"
 
-# 2. Mock API responds
-curl http://localhost:8000/health
-# Expected: {"status": "ok", "service": "solarops-mock-api"}
+# 2. Import W-Reg in n8n UI
+# n8n → Workflows → Import from file → select n8n/workflows/w-reg.json
+# Expected: workflow appears with 11 nodes, no broken connections
 
-# 3. n8n UI accessible
-open http://localhost:5678
-# Expected: n8n login page
+# 3. Run W-Reg manually with test data
+# n8n → W-Reg → Execute → Run manually
+# Expected: Notion Plants DB gains 1 row for plant-001
 
-# 4. Grafana UI accessible
-open http://localhost:3001
-# Expected: Grafana login page
+# 4. Re-run W-Reg (idempotency check)
+# Expected: 0 new rows created; existing row updated; no duplicate plant-001
 
-# 5. n8n backend is SQLite — not TimescaleDB
-docker exec solarops-n8n ls /home/node/.n8n/database.sqlite
-# Expected: /home/node/.n8n/database.sqlite (file exists)
+# 5. Import and run W2 after W-Reg
+# Expected: Assets DB gains 12 rows (12 devices for plant-001)
 
-# 6. TimescaleDB does NOT have an n8n schema
-docker exec solarops-timescaledb psql -U $POSTGRES_USER -d $POSTGRES_DB \
-  -c "\dn" | grep n8n
-# Expected: (no rows) — n8n schema absent
+# 6. Check Audit Log DB
+# Expected: 1 row per workflow run with Status = "✅ Success"
 
-# 7. 5432 is NOT exposed to 0.0.0.0
-docker compose port timescaledb 5432
-# Expected: 127.0.0.1:5432 (not 0.0.0.0:5432)
-
-# 8. n8n reaches mock-api (run from n8n Execute Workflow node)
-# HTTP Request node: GET http://mock-api:8000/health
-# Expected: {"status": "ok", "service": "solarops-mock-api"}
+# 7. Check Plant relation in Assets
+# Each asset in Assets DB should show a linked page in the Plant field
+# Expected: clicking the relation opens the plant-001 page in Plants DB
 ```
 
-**Most likely failure:** n8n can't reach mock-api.
-**Fix:** Confirm both services are on `solarops-net`. Use service name `mock-api`, not `localhost`, inside n8n nodes.
+**Most likely failure:** Notion node can't find the database.
+**Fix:** In n8n, open each Notion node and re-select the Database ID field — paste the ID from `.env`. The `$env.NOTION_PLANTS_DB_ID` expression requires the env var to be set in n8n Settings → Environment Variables.
 
-**Second most likely failure:** n8n volume permission error on startup.
-**Fix:** The `n8n_data` volume is owned by the n8n image's non-root user (`node`, uid 1000). Ensure no root-owned files exist in the volume from a prior run. `docker compose down -v` removes the volume for a clean retry.
+**Second most likely failure:** Relation field not accepted by Notion node.
+**Fix:** The Plant relation field requires the **page ID** of the linked Plants record (a UUID), not the plant name or plant_id text. W2 fetches this page ID in the "Notion: Get plant page ID" step before creating assets.
 
 ---
 
 ## Next Sprint
 
-**Phase 1 — Mock API endpoints (Days 3–5)**
+**Phase 3 — W1 Daily KPI Sync + expected vs actual energy (Days 9–12)**
 
-- `/v1/plants` — plant list endpoint
-- `/v1/plants/{id}/devices` — asset list per plant
-- `mock-api/data/plants.json`, `mock-api/data/devices.json` — seed data
-- Migrate to `pyproject.toml` with pinned deps
-- pytest for health + new endpoints
-- Minimal CI pipeline green (lint, pytest, `docker compose config`)
+- Mock `/v1/plants/{id}/kpis?date=YYYY-MM-DD` endpoint
+- W1 workflow: fetch KPI → compute expected energy → upsert Daily Performance DB
+- Underperformance flag logic (variance % < −5)
+- TimescaleDB `plant_kpis` insert from n8n
+- Grafana datasource provisioned as code
