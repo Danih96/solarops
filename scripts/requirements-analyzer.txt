@@ -1,0 +1,3 @@
+# Dependencies for scripts/analyze_ci_failure.py --summarize
+# Pin the version after first install: pip install anthropic && pip freeze | grep anthropic
+anthropic
